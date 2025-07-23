@@ -14,15 +14,15 @@
           width: 8px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-          background: #1f2937; /* gray-800 */
+          background: #2d3748; /* gray-800 */
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #4b5563; /* gray-600 */
+          background: #4a5568; /* gray-700 */
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #6b7280; /* gray-500 */
+          background: #6b7280; /* gray-600 */
         }
 
         /* Estilos para la animación de cambio de valor de nutriente */
@@ -30,7 +30,7 @@
             transition: background-color 0.3s ease-in-out, transform 0.15s ease-out;
         }
         .nutrient-value-animate.highlight {
-            background-color: rgba(6, 182, 212, 0.3); /* teal-500 con transparencia */
+            background-color: rgba(99, 102, 241, 0.5); /* indigo-500 con transparencia */
             transform: scale(1.02); /* Ligero escalado para énfasis */
         }
         .nutrient-bar {
@@ -42,7 +42,7 @@
         }
         .nutrient-bar-fill {
             height: 100%;
-            background-color: #06b6d4; /* teal-500 */
+            background-color: #6366f1; /* indigo-500 */
             transition: width 0.3s ease-in-out; /* Animación de la barra */
         }
         .nutrient-bar-fill.over-limit {
@@ -67,13 +67,12 @@
             { id: 'colacion', name: 'Colación', time: '11:00', items: [] },
         ];
 
-        // Opciones de grupos/platos para el desplegable
-        const GROUP_OPTIONS = [
-            'Plato 1',
+        // Opciones predefinidas para los grupos de alimentos (platos)
+        const FOOD_GROUP_OPTIONS = [
             'Plato Principal',
             'Segundo Plato',
-            'Bebida',
             'Acompañamiento',
+            'Bebida',
             'Postre',
             'Snack',
             'Otros'
@@ -210,7 +209,8 @@
                 // Determinar qué nutrientes cambiaron y activar el resaltado
                 const updatedHighlights = {};
                 const checkAndHighlight = (key, newValue, oldValue) => {
-                    if (newValue.toFixed(1) !== oldValue.toFixed(1)) { // Comparar valores fijos para evitar problemas de coma flotante
+                    // Solo resaltar si el valor cambia significativamente (ej. más de 0.1)
+                    if (Math.abs(newValue - oldValue) > 0.1) {
                         updatedHighlights[key] = true;
                         if (highlightTimeoutRef.current[key]) clearTimeout(highlightTimeoutRef.current[key]);
                         highlightTimeoutRef.current[key] = setTimeout(() => {
@@ -235,14 +235,15 @@
                 calculateDailyNutrients();
             }, [mealPlan]); // Recalcular solo cuando cambia el plan de comidas
 
-            // Función para añadir un alimento a una comida específica con cantidad y grupo (default 'Plato 1')
-            const addFoodToMeal = (food, mealId, quantity = 100, group = 'Plato 1') => {
+            // Función para añadir un alimento a una comida específica con cantidad y grupo
+            // Por defecto, el grupo es 'Plato Principal'
+            const addFoodToMeal = (food, mealId, quantity = 100, group = 'Plato Principal') => {
                 setMealPlan(prevMealPlan =>
                     prevMealPlan.map(meal =>
                         meal.id === mealId ? { ...meal, items: [...meal.items, { ...food, quantity, unit: food.unitBase, group }] } : meal
                     )
                 );
-                // No limpiar el término de búsqueda ni los resultados para permitir añadir múltiples rápidamente
+                // No limpiamos el término de búsqueda ni los resultados para permitir añadir más rápidamente
                 // setMealSearchTerms(prev => ({ ...prev, [mealId]: '' }));
                 // setMealSearchResults(prev => ({ ...prev, [mealId]: [] }));
             };
@@ -308,6 +309,10 @@
                 }
 
                 searchDebounceRef.current[mealId] = setTimeout(() => {
+                    if (value.length < 2) { // Evitar búsquedas muy cortas
+                        setMealSearchResults(prev => ({ ...prev, [mealId]: [] }));
+                        return;
+                    }
                     const filtered = alimentos.filter(alimento =>
                         alimento.name.toLowerCase().includes(value.toLowerCase())
                     ).slice(0, 5); // Limitar a 5 resultados
@@ -336,11 +341,11 @@
                 const displayPercentage = target ? `${percentage.toFixed(0)}%` : '';
 
                 return (
-                    <div className="flex flex-col mb-1.5 text-xs">
+                    <div className="flex flex-col text-xs py-0.5">
                         <div className="flex justify-between items-center">
-                            <p className="font-semibold text-gray-200">{name}:</p>
+                            <p className="font-medium text-gray-200">{name}:</p>
                             <p className={`text-gray-50 text-sm nutrient-value-animate ${isHighlighted ? 'highlight' : ''}`}>
-                                {displayValue} {unit} {displayPercentage && <span className="text-gray-400 font-normal">({displayPercentage})</span>}
+                                {displayValue} {unit} {displayPercentage && <span className="text-gray-400">({displayPercentage})</span>}
                             </p>
                         </div>
                         {target > 0 && (
@@ -356,20 +361,20 @@
             };
 
             return (
-                <div className="min-h-screen bg-gray-900 text-gray-100 p-4 font-sans flex flex-col lg:flex-row gap-4">
+                <div className="min-h-screen bg-gray-900 text-gray-100 p-4 flex flex-col lg:flex-row gap-4">
                     {/* Main Content Area: Meal Planner on left, Nutrient Summary on right */}
                     <div className="flex-grow flex flex-col lg:flex-row gap-4">
                         {/* Meal Planner Section (Left/Top) */}
                         <div className="lg:w-2/3 flex flex-col">
                             {/* Day Selector */}
-                            <div className="bg-gray-800 p-3 rounded-lg shadow-xl mb-4 flex justify-center flex-wrap gap-2">
+                            <div className="bg-gray-800 p-3 rounded-lg shadow-md mb-4 flex justify-center flex-wrap gap-2">
                                 {daysOfWeek.map(day => (
                                     <button
                                         key={day}
                                         onClick={() => setCurrentDay(day)}
                                         className={`px-3 py-1 text-sm rounded-md font-semibold transition duration-200 ${
                                             currentDay === day
-                                                ? 'bg-emerald-600 text-white shadow-md'
+                                                ? 'bg-blue-600 text-white shadow-md'
                                                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                         }`}
                                     >
@@ -378,19 +383,19 @@
                                 ))}
                             </div>
 
-                            <div className="bg-gray-800 p-4 rounded-lg shadow-xl flex-grow overflow-y-auto custom-scrollbar">
+                            <div className="bg-gray-800 p-4 rounded-lg shadow-lg flex-grow overflow-y-auto custom-scrollbar">
                                 <h2 className="text-xl font-bold text-gray-100 mb-4 text-center">Mi Plan de Comidas Diario ({currentDay})</h2>
                                 <div className="space-y-3">
                                     {mealPlan.map((meal) => (
-                                        <div key={meal.id} className="border border-gray-700 rounded-lg overflow-hidden shadow-md">
+                                        <div key={meal.id} className="border border-gray-700 rounded-lg overflow-hidden shadow-sm">
                                             <div
-                                                className="bg-emerald-700 text-white px-4 py-2 flex justify-between items-center rounded-t-lg"
+                                                className="bg-blue-800 text-white px-4 py-2 flex justify-between items-center rounded-t-lg"
                                             >
                                                 <h3 className="font-semibold text-base">{meal.name} ({meal.time})</h3>
                                                 {editingMealId !== meal.id ? (
                                                     <button
                                                         onClick={() => setEditingMealId(meal.id)}
-                                                        className="px-2 py-1 bg-emerald-500 hover:bg-emerald-600 rounded-md text-xs transition duration-200 shadow"
+                                                        className="px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded-md text-xs transition duration-200"
                                                     >
                                                         Editar
                                                     </button>
@@ -398,10 +403,10 @@
                                                     <button
                                                         onClick={() => {
                                                             setEditingMealId(null);
-                                                            setMealSearchTerms(prev => ({ ...prev, [meal.id]: '' }));
+                                                            setMealSearchTerms(prev => ({ ...prev, [meal.id]: '' })); // Clear search on closing edit
                                                             setMealSearchResults(prev => ({ ...prev, [meal.id]: [] }));
                                                         }}
-                                                        className="px-2 py-1 bg-red-500 hover:bg-red-600 rounded-md text-xs transition duration-200 shadow"
+                                                        className="px-2 py-1 bg-green-600 hover:bg-green-700 rounded-md text-xs transition duration-200"
                                                     >
                                                         Cerrar Edición
                                                     </button>
@@ -418,7 +423,7 @@
                                                             id={`time-${meal.id}`}
                                                             value={meal.time}
                                                             onChange={(e) => updateMealTime(meal.id, e.target.value)}
-                                                            className="w-full p-1.5 text-sm border border-gray-600 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-gray-800 text-gray-100"
+                                                            className="w-full p-1.5 text-sm border border-gray-600 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-gray-800 text-gray-100"
                                                         />
                                                     </div>
                                                     <div className="mb-3 relative">
@@ -429,7 +434,7 @@
                                                             type="text"
                                                             id={`search-${meal.id}`}
                                                             placeholder="Buscar y añadir..."
-                                                            className="w-full p-1.5 text-sm border border-gray-600 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-gray-800 text-gray-100 placeholder-gray-400"
+                                                            className="w-full p-1.5 text-sm border border-gray-600 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-gray-800 text-gray-100 placeholder-gray-400"
                                                             value={mealSearchTerms[meal.id] || ''}
                                                             onChange={(e) => handleMealSearchChange(meal.id, e.target.value)}
                                                             onKeyPress={(e) => handleSearchKeyPress(e, meal.id)}
@@ -455,7 +460,7 @@
                                                                 <li key={index} className="bg-gray-800 p-2 rounded-md shadow-sm flex flex-col sm:flex-row justify-between items-center border border-gray-600 text-sm">
                                                                     <div className="flex-grow mb-1 sm:mb-0">
                                                                         <p className="font-medium text-gray-50">{item.name}</p>
-                                                                        <div className="flex items-center gap-2 mt-1">
+                                                                        <div className="flex flex-wrap items-center gap-2 mt-1">
                                                                             <input
                                                                                 type="number"
                                                                                 min="1"
@@ -465,11 +470,11 @@
                                                                             />
                                                                             <span className="text-gray-300 text-xs">{item.unit}</span>
                                                                             <select
-                                                                                value={item.group || 'Plato 1'}
+                                                                                value={item.group || 'Plato Principal'} // Asegura un valor por defecto
                                                                                 onChange={(e) => updateFoodGroup(meal.id, index, e.target.value)}
-                                                                                className="flex-grow p-1 border border-gray-600 rounded-md bg-gray-700 text-gray-100 text-xs"
+                                                                                className="p-1 border border-gray-600 rounded-md bg-gray-700 text-gray-100 text-xs flex-grow min-w-[100px]"
                                                                             >
-                                                                                {GROUP_OPTIONS.map(option => (
+                                                                                {FOOD_GROUP_OPTIONS.map(option => (
                                                                                     <option key={option} value={option}>{option}</option>
                                                                                 ))}
                                                                             </select>
@@ -495,7 +500,7 @@
                                                     {meal.items.length > 0 ? (
                                                         // Agrupar y mostrar por "grupo" (plato)
                                                         Object.entries(meal.items.reduce((acc, item) => {
-                                                            const groupName = item.group || 'Plato 1'; // Fallback a 'Plato 1' para visualización
+                                                            const groupName = item.group || 'Plato Principal';
                                                             if (!acc[groupName]) {
                                                                 acc[groupName] = [];
                                                             }
@@ -526,13 +531,13 @@
                         </div>
 
                         {/* Nutrient Summary Section (Right) */}
-                        <div className="lg:w-1/3 bg-gray-800 p-4 rounded-lg shadow-xl flex flex-col">
+                        <div className="lg:w-1/3 bg-gray-800 p-4 rounded-lg shadow-lg flex flex-col">
                             <h2 className="text-xl font-bold text-gray-100 mb-4 text-center">Resumen Nutricional Diario</h2>
-                            <div className="flex-grow space-y-4">
+                            <div className="flex-grow space-y-3">
                                 {/* Información Principal (Macronutrientes y Precio) */}
-                                <div className="bg-gray-800 p-3 rounded-lg border border-emerald-600 shadow-md">
-                                    <h3 className="text-lg font-bold text-emerald-200 mb-2">Información Principal</h3>
-                                    <div className="grid grid-cols-1 gap-y-1 text-sm">
+                                <div className="bg-gray-700 p-3 rounded-lg border border-blue-600">
+                                    <h3 className="text-lg font-bold text-blue-200 mb-2">Información Principal</h3>
+                                    <div className="grid grid-cols-1 gap-y-0 text-sm">
                                         <NutrientDisplay
                                             name="Calorías" value={dailyNutrients.calories} unit="kcal" target={DAILY_RECOMMENDED_VALUES.calories}
                                             isHighlighted={highlightedNutrients.calories}
@@ -565,7 +570,7 @@
                                             name="Sal" value={dailyNutrients.salt} unit="g" target={DAILY_RECOMMENDED_VALUES.salt}
                                             isHighlighted={highlightedNutrients.salt}
                                         />
-                                        <div className="col-span-1 mt-2 border-t border-gray-700 pt-2">
+                                        <div className="col-span-1 pt-1 mt-2 border-t border-gray-600">
                                             <NutrientDisplay
                                                 name="Precio Diario" value={dailyNutrients.price} unit="€" isPrice={true}
                                                 isHighlighted={highlightedNutrients.price}
@@ -575,9 +580,9 @@
                                 </div>
 
                                 {/* Vitaminas */}
-                                <div className="bg-gray-800 p-3 rounded-lg border border-indigo-600 shadow-md">
-                                    <h3 className="text-lg font-bold text-indigo-200 mb-2">Vitaminas</h3>
-                                    <div className="grid grid-cols-1 gap-y-1 text-xs">
+                                <div className="bg-gray-700 p-3 rounded-lg border border-green-600">
+                                    <h3 className="text-lg font-bold text-green-200 mb-2">Vitaminas</h3>
+                                    <div className="grid grid-cols-1 gap-y-0 text-xs">
                                         {vitamins.length > 0 ? (
                                             vitamins.map(([name, data]) => (
                                                 <NutrientDisplay
@@ -587,15 +592,15 @@
                                                 />
                                             ))
                                         ) : (
-                                            <p className="text-xs text-indigo-300 col-span-1">No hay vitaminas registradas.</p>
+                                            <p className="text-xs text-green-300 col-span-1">No hay vitaminas registradas.</p>
                                         )}
                                     </div>
                                 </div>
 
                                 {/* Minerales */}
-                                <div className="bg-gray-800 p-3 rounded-lg border border-purple-600 shadow-md">
+                                <div className="bg-gray-700 p-3 rounded-lg border border-purple-600">
                                     <h3 className="text-lg font-bold text-purple-200 mb-2">Minerales</h3>
-                                    <div className="grid grid-cols-1 gap-y-1 text-xs">
+                                    <div className="grid grid-cols-1 gap-y-0 text-xs">
                                         {minerals.length > 0 ? (
                                             minerals.map(([name, data]) => (
                                                 <NutrientDisplay

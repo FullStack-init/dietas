@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planificador de Dietas</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        /* Estilos personalizados para la barra de desplazamiento en modo oscuro */
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #4a5568; /* gray-700 */
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #6b7280; /* gray-600 */
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #9ca3af; /* gray-500 */
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // Desestructuración de React para usar useState, useEffect, useCallback
+        const { useState, useEffect, useCallback } = React;
+
+        // Componente principal de la aplicación
+        const App = () => {
+            // Estado para almacenar todos los datos de alimentos del archivo JSON
+            const [alimentos, setAlimentos] = useState([]);
+            // Estado para almacenar el plan de comidas del usuario para el día
+            const [mealPlan, setMealPlan] = useState([
+                { id: 'desayuno', name: 'Desayuno', time: '08:00', items: [] },
+                { id: 'almuerzo', name: 'Almuerzo', time: '13:00', items: [] },
+                { id: 'merienda', name: 'Merienda', time: '17:00', items: [] },
+                { id: 'cena', name: 'Cena', time: '21:00', items: [] },
+                { id: 'colacion', name: 'Colación', time: '11:00', items: [] },
+            ]);
+            // Estado para el término de búsqueda para filtrar alimentos
+            const [searchTerm, setSearchTerm] = useState('');
+            // Estado para almacenar los totales diarios calculados de nutrientes
+            const [dailyNutrients, setDailyNutrients] = useState({
+                calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugars: 0, saturatedFat: 0, salt: 0, micronutrients: {}, // Almacena todas las vitaminas y minerales dinámicamente
+            });
+            // Estado para gestionar qué sección de comida está expandida
+            const [expandedMeal, setExpandedMeal] = useState(null);
+
+            // Efecto para cargar los datos de alimentos desde el archivo alimentos.json
+            useEffect(() => {
+                const fetchAlimentos = async () => {
+                    try {
+                        // En un archivo HTML independiente, se obtiene de una ruta relativa.
+                        // Asegúrate de que 'alimentos.json' esté en el mismo directorio que este archivo HTML.
+                        const response = await fetch('alimentos.json');
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        const data = await response.json();
+                        setAlimentos(data);
+                    } catch (error) {
+                        console.error("Error al cargar los datos de alimentos:", error);
+                        // Puedes mostrar un mensaje amigable al usuario aquí
+                    }
+                };
+                fetchAlimentos();
+            }, []); // El array de dependencia vacío significa que este efecto se ejecuta una vez al montar
+
+            // Función para calcular los nutrientes diarios cada vez que cambia el plan de comidas
+            const calculateDailyNutrients = useCallback(() => {
+                const newNutrients = {
+                    calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugars: 0, saturatedFat: 0, salt: 0, micronutrients: {},
+                };
+
+                mealPlan.forEach(meal => {
+                    meal.items.forEach(item => {
+                        // Sumar macronutrientes, asegurándose de que sean números
+                        newNutrients.calories += Number(item.calories) || 0;
+                        newNutrients.protein += Number(item.protein) || 0;
+                        newNutrients.carbs += Number(item.carbs) || 0;
+                        newNutrients.fat += Number(item.fat) || 0;
+                        newNutrients.fiber += Number(item.fiber) || 0;
+                        newNutrients.sugars += Number(item.sugars) || 0;
+                        newNutrients.saturatedFat += Number(item.saturatedFat) || 0;
+                        newNutrients.salt += Number(item.salt) || 0;
+
+                        // Sumar micronutrientes dinámicamente
+                        if (item.micronutrients) {
+                            for (const key in item.micronutrients) {
+                                const micro = item.micronutrients[key];
+                                if (micro && typeof micro.value === 'number' && micro.unit) {
+                                    if (!newNutrients.micronutrients[key]) {
+                                        newNutrients.micronutrients[key] = { value: 0, unit: micro.unit, type: micro.type };
+                                    }
+                                    newNutrients.micronutrients[key].value += micro.value;
+                                }
+                            }
+                        }
+                    });
+                });
+                setDailyNutrients(newNutrients);
+            }, [mealPlan]); // Recalcular cuando cambia el plan de comidas
+
+            // Efecto para recalcular los nutrientes cada vez que se actualiza el mealPlan
+            useEffect(() => {
+                calculateDailyNutrients();
+            }, [mealPlan, calculateDailyNutrients]);
+
+            // Filtrar alimentos basados en el término de búsqueda
+            const filteredAlimentos = alimentos.filter(alimento =>
+                alimento.name.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+
+            // Función para añadir un alimento a una comida específica
+            const addFoodToMeal = (food, mealId) => {
+                setMealPlan(prevMealPlan =>
+                    prevMealPlan.map(meal =>
+                        meal.id === mealId ? { ...meal, items: [...meal.items, food] } : meal
+                    )
+                );
+            };
+
+            // Función para eliminar un alimento de una comida específica
+            const removeFoodFromMeal = (mealId, foodIndex) => {
+                setMealPlan(prevMealPlan =>
+                    prevMealPlan.map(meal =>
+                        meal.id === mealId
+                            ? { ...meal, items: meal.items.filter((_, index) => index !== foodIndex) }
+                            : meal
+                    )
+                );
+            };
+
+            // Función para actualizar la hora de una comida
+            const updateMealTime = (mealId, newTime) => {
+                setMealPlan(prevMealPlan =>
+                    prevMealPlan.map(meal =>
+                        meal.id === mealId ? { ...meal, time: newTime } : meal
+                    )
+                );
+            };
+
+            return (
+                // Contenedor principal con clases para modo oscuro
+                <div className="min-h-screen bg-gray-900 text-gray-100 p-4 font-sans flex flex-col lg:flex-row">
+                    {/* Sección de búsqueda y lista de alimentos */}
+                    <div className="lg:w-1/3 bg-gray-800 p-6 rounded-lg shadow-lg mb-6 lg:mb-0 lg:mr-6 flex flex-col">
+                        <h2 className="text-2xl font-bold text-gray-100 mb-4 text-center">Buscar Alimentos</h2>
+                        <input
+                            type="text"
+                            placeholder="Buscar alimento..."
+                            className="w-full p-3 border border-gray-600 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-gray-100 placeholder-gray-400"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        <div className="flex-grow overflow-y-auto custom-scrollbar pr-2">
+                            {filteredAlimentos.length > 0 ? (
+                                filteredAlimentos.map((alimento) => (
+                                    <div key={alimento.name} className="bg-gray-700 p-3 mb-3 rounded-lg flex items-center justify-between shadow-sm border border-gray-600">
+                                        <div>
+                                            <h3 className="font-semibold text-gray-50">{alimento.name}</h3>
+                                            <p className="text-sm text-gray-300">{alimento.calories} kcal</p>
+                                        </div>
+                                        <div className="relative group">
+                                            <button
+                                                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-200 text-sm"
+                                                onClick={() => setExpandedMeal(expandedMeal === `add-${alimento.name}` ? null : `add-${alimento.name}`)}
+                                            >
+                                                Agregar
+                                            </button>
+                                            {expandedMeal === `add-${alimento.name}` && (
+                                                <div className="absolute right-0 mt-2 w-40 bg-gray-700 border border-gray-600 rounded-lg shadow-lg z-10">
+                                                    {mealPlan.map(meal => (
+                                                        <button
+                                                            key={meal.id}
+                                                            className="block w-full text-left px-4 py-2 text-gray-100 hover:bg-gray-600 rounded-lg"
+                                                            onClick={() => {
+                                                                addFoodToMeal(alimento, meal.id);
+                                                                setExpandedMeal(null); // Cerrar el desplegable después de añadir
+                                                            }}
+                                                        >
+                                                            {meal.name}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-center text-gray-400">No se encontraron alimentos.</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Sección del plan de comidas y resumen nutricional */}
+                    <div className="lg:w-2/3 flex flex-col">
+                        {/* Sección del plan de comidas */}
+                        <div className="bg-gray-800 p-6 rounded-lg shadow-lg mb-6 flex-grow">
+                            <h2 className="text-2xl font-bold text-gray-100 mb-4 text-center">Mi Plan de Comidas Diario</h2>
+                            <div className="space-y-4">
+                                {mealPlan.map((meal) => (
+                                    <div key={meal.id} className="border border-gray-600 rounded-lg overflow-hidden shadow-sm">
+                                        <div
+                                            className="bg-blue-700 text-white p-4 flex justify-between items-center cursor-pointer rounded-t-lg"
+                                            onClick={() => setExpandedMeal(expandedMeal === meal.id ? null : meal.id)}
+                                        >
+                                            <h3 className="font-semibold text-lg">{meal.name} ({meal.time})</h3>
+                                            <span className="text-xl">
+                                                {expandedMeal === meal.id ? '−' : '+'}
+                                            </span>
+                                        </div>
+                                        {expandedMeal === meal.id && (
+                                            <div className="p-4 bg-gray-700">
+                                                <div className="mb-4">
+                                                    <label htmlFor={`time-${meal.id}`} className="block text-sm font-medium text-gray-300 mb-1">
+                                                        Hora:
+                                                    </label>
+                                                    <input
+                                                        type="time"
+                                                        id={`time-${meal.id}`}
+                                                        value={meal.time}
+                                                        onChange={(e) => updateMealTime(meal.id, e.target.value)}
+                                                        className="p-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-gray-100"
+                                                    />
+                                                </div>
+                                                {meal.items.length > 0 ? (
+                                                    <ul className="space-y-2">
+                                                        {meal.items.map((item, index) => (
+                                                            <li key={index} className="bg-gray-800 p-3 rounded-lg shadow-sm flex justify-between items-center border border-gray-600">
+                                                                <div>
+                                                                    <p className="font-medium text-gray-50">{item.name}</p>
+                                                                    <p className="text-sm text-gray-300">{item.calories} kcal</p>
+                                                                </div>
+                                                                <button
+                                                                    className="text-red-400 hover:text-red-600 transition duration-200"
+                                                                    onClick={() => removeFoodFromMeal(meal.id, index)}
+                                                                >
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 11-2 0v6a1 1 0 112 0V8z" clipRule="evenodd" />
+                                                                    </svg>
+                                                                </button>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                ) : (
+                                                    <p className="text-center text-gray-400">No hay alimentos en este momento.</p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Sección de resumen nutricional */}
+                        <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
+                            <h2 className="text-2xl font-bold text-gray-100 mb-4 text-center">Resumen Nutricional Diario</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {/* Macronutrientes */}
+                                <div className="bg-blue-800 p-4 rounded-lg border border-blue-600">
+                                    <p className="font-semibold text-blue-200">Calorías:</p>
+                                    <p className="text-lg text-blue-50">{dailyNutrients.calories.toFixed(1)} kcal</p>
+                                </div>
+                                <div className="bg-green-800 p-4 rounded-lg border border-green-600">
+                                    <p className="font-semibold text-green-200">Proteínas:</p>
+                                    <p className="text-lg text-green-50">{dailyNutrients.protein.toFixed(1)} g</p>
+                                </div>
+                                <div className="bg-yellow-800 p-4 rounded-lg border border-yellow-600">
+                                    <p className="font-semibold text-yellow-200">Carbohidratos:</p>
+                                    <p className="text-lg text-yellow-50">{dailyNutrients.carbs.toFixed(1)} g</p>
+                                </div>
+                                <div className="bg-red-800 p-4 rounded-lg border border-red-600">
+                                    <p className="font-semibold text-red-200">Grasas:</p>
+                                    <p className="text-lg text-red-50">{dailyNutrients.fat.toFixed(1)} g</p>
+                                </div>
+                                <div className="bg-purple-800 p-4 rounded-lg border border-purple-600">
+                                    <p className="font-semibold text-purple-200">Fibra:</p>
+                                    <p className="text-lg text-purple-50">{dailyNutrients.fiber.toFixed(1)} g</p>
+                                </div>
+                                <div className="bg-orange-800 p-4 rounded-lg border border-orange-600">
+                                    <p className="font-semibold text-orange-200">Azúcares:</p>
+                                    <p className="text-lg text-orange-50">{dailyNutrients.sugars.toFixed(1)} g</p>
+                                </div>
+                                <div className="bg-pink-800 p-4 rounded-lg border border-pink-600">
+                                    <p className="font-semibold text-pink-200">Grasas Saturadas:</p>
+                                    <p className="text-lg text-pink-50">{dailyNutrients.saturatedFat.toFixed(1)} g</p>
+                                </div>
+                                <div className="bg-teal-800 p-4 rounded-lg border border-teal-600">
+                                    <p className="font-semibold text-teal-200">Sal:</p>
+                                    <p className="text-lg text-teal-50">{dailyNutrients.salt.toFixed(1)} g</p>
+                                </div>
+
+                                {/* Micronutrientes */}
+                                {Object.keys(dailyNutrients.micronutrients).length > 0 && (
+                                    <div className="col-span-full mt-4">
+                                        <h3 className="text-xl font-bold text-gray-200 mb-3">Micronutrientes:</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {Object.entries(dailyNutrients.micronutrients).map(([name, data]) => (
+                                                <div key={name} className="bg-indigo-800 p-4 rounded-lg border border-indigo-600">
+                                                    <p className="font-semibold text-indigo-200">{name}:</p>
+                                                    <p className="text-lg text-indigo-50">{data.value.toFixed(2)} {data.unit}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        // Renderiza el componente App en el elemento con id 'root'
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

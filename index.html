@@ -12,7 +12,7 @@
     <!-- Babel Standalone para la compilación de JSX en el navegador -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        /* Estilos personalizados para la barra de desplazamiento en modo oscuro */
+        /* Custom scrollbar styles for dark mode */
         .custom-scrollbar::-webkit-scrollbar {
           width: 8px;
         }
@@ -27,6 +27,17 @@
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: #6b7280; /* gray-600 */
         }
+
+        /* CSS for the highlight animation on nutrient update */
+        .nutrient-highlight {
+            animation: highlight-flash 0.5s ease-out;
+        }
+
+        @keyframes highlight-flash {
+            0% { background-color: #4f46e5; } /* indigo-600 */
+            50% { background-color: #4f46e5; } /* indigo-600 */
+            100% { background-color: transparent; }
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100">
@@ -37,7 +48,6 @@
 
         const daysOfWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
-        // Estructura inicial de un plan de comidas vacío
         const initialMealPlan = [
             { id: 'desayuno', name: 'Desayuno', time: '08:00', items: [] },
             { id: 'almuerzo', name: 'Almuerzo', time: '13:00', items: [] },
@@ -55,14 +65,14 @@
             const [expandedMeal, setExpandedMeal] = useState(null);
             const [currentDay, setCurrentDay] = useState('Lunes');
 
-            // Estado para el término de búsqueda y resultados por cada comida
             const [mealSearchTerms, setMealSearchTerms] = useState({});
             const [mealSearchResults, setMealSearchResults] = useState({});
-
-            // Ref para el temporizador de debounce de búsqueda
             const searchDebounceRef = useRef({});
 
-            // Cargar datos de alimentos
+            // State to trigger nutrient highlight animation
+            const [nutrientHighlightKey, setNutrientHighlightKey] = useState(0);
+
+            // Fetch food data
             useEffect(() => {
                 const fetchAlimentos = async () => {
                     try {
@@ -79,24 +89,24 @@
                 fetchAlimentos();
             }, []);
 
-            // Cargar plan de comidas del almacenamiento local
+            // Load meal plan from local storage
             useEffect(() => {
                 const savedPlan = localStorage.getItem(`mealPlan_${currentDay}`);
                 if (savedPlan) {
                     setMealPlan(JSON.parse(savedPlan));
                 } else {
-                    setMealPlan(initialMealPlan.map(meal => ({ ...meal, items: [] }))); // Asegurar que los items estén vacíos si es un nuevo día
+                    setMealPlan(initialMealPlan.map(meal => ({ ...meal, items: [] })));
                 }
             }, [currentDay]);
 
-            // Guardar plan de comidas en el almacenamiento local
+            // Save meal plan to local storage
             useEffect(() => {
                 if (mealPlan.length > 0) {
                     localStorage.setItem(`mealPlan_${currentDay}`, JSON.stringify(mealPlan));
                 }
             }, [mealPlan, currentDay]);
 
-            // Función para calcular nutrientes diarios
+            // Calculate daily nutrients
             const calculateDailyNutrients = useCallback(() => {
                 const newNutrients = {
                     calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugars: 0, saturatedFat: 0, salt: 0, price: 0, micronutrients: {},
@@ -104,7 +114,7 @@
 
                 mealPlan.forEach(meal => {
                     meal.items.forEach(item => {
-                        const quantityFactor = (item.quantity || 0) / 100; // Factor para escalar nutrientes (por 100g/ml)
+                        const quantityFactor = (item.quantity || 0) / 100;
 
                         newNutrients.calories += (Number(item.calories) || 0) * quantityFactor;
                         newNutrients.protein += (Number(item.protein) || 0) * quantityFactor;
@@ -114,7 +124,7 @@
                         newNutrients.sugars += (Number(item.sugars) || 0) * quantityFactor;
                         newNutrients.saturatedFat += (Number(item.saturatedFat) || 0) * quantityFactor;
                         newNutrients.salt += (Number(item.salt) || 0) * quantityFactor;
-                        newNutrients.price += (Number(item.price) || 0) * quantityFactor; // Calcular precio
+                        newNutrients.price += (Number(item.price) || 0) * quantityFactor;
 
                         if (item.micronutrients) {
                             for (const key in item.micronutrients) {
@@ -130,25 +140,25 @@
                     });
                 });
                 setDailyNutrients(newNutrients);
+                setNutrientHighlightKey(prevKey => prevKey + 1); // Trigger animation
             }, [mealPlan]);
 
             useEffect(() => {
                 calculateDailyNutrients();
             }, [mealPlan, calculateDailyNutrients]);
 
-            // Función para añadir un alimento a una comida específica con cantidad
+            // Add food to meal with quantity
             const addFoodToMeal = (food, mealId, quantity = 100) => {
                 setMealPlan(prevMealPlan =>
                     prevMealPlan.map(meal =>
                         meal.id === mealId ? { ...meal, items: [...meal.items, { ...food, quantity, unit: food.unitBase }] } : meal
                     )
                 );
-                // Limpiar el término de búsqueda y los resultados después de añadir
                 setMealSearchTerms(prev => ({ ...prev, [mealId]: '' }));
                 setMealSearchResults(prev => ({ ...prev, [mealId]: [] }));
             };
 
-            // Función para eliminar un alimento de una comida específica
+            // Remove food from meal
             const removeFoodFromMeal = (mealId, foodIndex) => {
                 setMealPlan(prevMealPlan =>
                     prevMealPlan.map(meal =>
@@ -159,7 +169,7 @@
                 );
             };
 
-            // Función para actualizar la cantidad de un alimento en una comida
+            // Update food quantity
             const updateFoodQuantity = (mealId, foodIndex, newQuantity) => {
                 setMealPlan(prevMealPlan =>
                     prevMealPlan.map(meal =>
@@ -175,7 +185,7 @@
                 );
             };
 
-            // Función para actualizar la hora de una comida
+            // Update meal time
             const updateMealTime = (mealId, newTime) => {
                 setMealPlan(prevMealPlan =>
                     prevMealPlan.map(meal =>
@@ -184,7 +194,7 @@
                 );
             };
 
-            // Manejador de cambio de búsqueda por comida con debounce
+            // Handle meal search input change with debounce
             const handleMealSearchChange = (mealId, value) => {
                 setMealSearchTerms(prev => ({ ...prev, [mealId]: value }));
 
@@ -195,216 +205,195 @@
                 searchDebounceRef.current[mealId] = setTimeout(() => {
                     const filtered = alimentos.filter(alimento =>
                         alimento.name.toLowerCase().includes(value.toLowerCase())
-                    ).slice(0, 5); // Limitar a 5 resultados para no saturar
+                    ).slice(0, 5);
                     setMealSearchResults(prev => ({ ...prev, [mealId]: filtered }));
-                }, 300); // Debounce de 300ms
+                }, 300);
             };
 
-            // Manejador de pulsación de tecla en el buscador (para Enter)
+            // Handle Enter key press in search to add first result
             const handleSearchKeyPress = (e, mealId) => {
                 if (e.key === 'Enter' && mealSearchResults[mealId] && mealSearchResults[mealId].length > 0) {
                     addFoodToMeal(mealSearchResults[mealId][0], mealId);
                 }
             };
 
-            // Filtra los micronutrientes en vitaminas y minerales
             const vitamins = Object.entries(dailyNutrients.micronutrients).filter(([, data]) => data.type === 'Vitamina');
             const minerals = Object.entries(dailyNutrients.micronutrients).filter(([, data]) => data.type === 'Mineral');
 
             return (
-                <div className="min-h-screen bg-gray-900 text-gray-100 p-4 font-sans flex flex-col lg:flex-row gap-6">
-                    {/* Sección de búsqueda global (ahora no se usa directamente para añadir, pero se mantiene por si el usuario quiere ver todos) */}
-                    {/* <div className="lg:w-1/3 bg-gray-800 p-6 rounded-lg shadow-lg flex flex-col">
-                        <h2 className="text-2xl font-bold text-gray-100 mb-4 text-center">Buscar Alimentos</h2>
-                        <input
-                            type="text"
-                            placeholder="Buscar alimento..."
-                            className="w-full p-3 border border-gray-600 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-gray-100 placeholder-gray-400"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                        <div className="flex-grow overflow-y-auto custom-scrollbar pr-2">
-                            {alimentos.filter(alimento => alimento.name.toLowerCase().includes(searchTerm.toLowerCase())).map((alimento) => (
-                                <div key={alimento.name} className="bg-gray-700 p-3 mb-3 rounded-lg flex items-center justify-between shadow-sm border border-gray-600">
-                                    <div>
-                                        <h3 className="font-semibold text-gray-50">{alimento.name}</h3>
-                                        <p className="text-sm text-gray-300">{alimento.calories} kcal</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div> */}
+                <div className="min-h-screen bg-gray-900 text-gray-100 p-4 font-sans flex flex-col lg:flex-row gap-4">
+                    {/* Main Content Area: Meal Planner on left, Nutrient Summary on right */}
+                    <div className="flex-grow flex flex-col lg:flex-row gap-4">
+                        {/* Meal Planner Section (Left/Top) */}
+                        <div className="lg:w-2/3 flex flex-col">
+                            {/* Day Selector */}
+                            <div className="bg-gray-800 p-3 rounded-lg shadow-lg mb-4 flex justify-center flex-wrap gap-2">
+                                {daysOfWeek.map(day => (
+                                    <button
+                                        key={day}
+                                        onClick={() => setCurrentDay(day)}
+                                        className={`px-3 py-1 text-sm rounded-md font-semibold transition duration-200 ${
+                                            currentDay === day
+                                                ? 'bg-blue-600 text-white shadow-md'
+                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                        }`}
+                                    >
+                                        {day}
+                                    </button>
+                                ))}
+                            </div>
 
-                    {/* Sección del plan de comidas y resumen nutricional */}
-                    <div className="flex-grow flex flex-col">
-                        {/* Selector de día de la semana */}
-                        <div className="bg-gray-800 p-4 rounded-lg shadow-lg mb-6 flex justify-center flex-wrap gap-2">
-                            {daysOfWeek.map(day => (
-                                <button
-                                    key={day}
-                                    onClick={() => setCurrentDay(day)}
-                                    className={`px-4 py-2 rounded-lg font-semibold transition duration-200 ${
-                                        currentDay === day
-                                            ? 'bg-blue-600 text-white shadow-md'
-                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                    }`}
-                                >
-                                    {day}
-                                </button>
-                            ))}
-                        </div>
+                            <div className="bg-gray-800 p-4 rounded-lg shadow-lg flex-grow">
+                                <h2 className="text-xl font-bold text-gray-100 mb-4 text-center">Mi Plan de Comidas Diario ({currentDay})</h2>
+                                <div className="space-y-3">
+                                    {mealPlan.map((meal) => (
+                                        <div key={meal.id} className="border border-gray-700 rounded-lg overflow-hidden shadow-sm">
+                                            <div
+                                                className="bg-blue-700 text-white px-4 py-2 flex justify-between items-center cursor-pointer rounded-t-lg"
+                                                onClick={() => setExpandedMeal(expandedMeal === meal.id ? null : meal.id)}
+                                            >
+                                                <h3 className="font-semibold text-base">{meal.name} ({meal.time})</h3>
+                                                <span className="text-lg">
+                                                    {expandedMeal === meal.id ? '−' : '+'}
+                                                </span>
+                                            </div>
+                                            {expandedMeal === meal.id && (
+                                                <div className="p-3 bg-gray-700">
+                                                    <div className="mb-3 relative">
+                                                        <label htmlFor={`search-${meal.id}`} className="block text-xs font-medium text-gray-300 mb-1">
+                                                            Añadir alimento:
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            id={`search-${meal.id}`}
+                                                            placeholder="Buscar y añadir..."
+                                                            className="w-full p-1.5 text-sm border border-gray-600 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-gray-800 text-gray-100 placeholder-gray-400"
+                                                            value={mealSearchTerms[meal.id] || ''}
+                                                            onChange={(e) => handleMealSearchChange(meal.id, e.target.value)}
+                                                            onKeyPress={(e) => handleSearchKeyPress(e, meal.id)}
+                                                        />
+                                                        {mealSearchTerms[meal.id] && mealSearchResults[meal.id] && mealSearchResults[meal.id].length > 0 && (
+                                                            <ul className="absolute z-10 w-full bg-gray-800 border border-gray-600 rounded-md mt-1 max-h-36 overflow-y-auto custom-scrollbar shadow-lg">
+                                                                {mealSearchResults[meal.id].map(food => (
+                                                                    <li
+                                                                        key={food.name}
+                                                                        className="p-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100"
+                                                                        onClick={() => addFoodToMeal(food, meal.id)}
+                                                                    >
+                                                                        {food.name} ({food.calories} kcal/100{food.unitBase})
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        )}
+                                                    </div>
 
-                        {/* Sección del plan de comidas */}
-                        <div className="bg-gray-800 p-6 rounded-lg shadow-lg mb-6 flex-grow">
-                            <h2 className="text-2xl font-bold text-gray-100 mb-4 text-center">Mi Plan de Comidas Diario ({currentDay})</h2>
-                            <div className="space-y-4">
-                                {mealPlan.map((meal) => (
-                                    <div key={meal.id} className="border border-gray-600 rounded-lg overflow-hidden shadow-sm">
-                                        <div
-                                            className="bg-blue-700 text-white p-4 flex justify-between items-center cursor-pointer rounded-t-lg"
-                                            onClick={() => setExpandedMeal(expandedMeal === meal.id ? null : meal.id)}
-                                        >
-                                            <h3 className="font-semibold text-lg">{meal.name} ({meal.time})</h3>
-                                            <span className="text-xl">
-                                                {expandedMeal === meal.id ? '−' : '+'}
-                                            </span>
-                                        </div>
-                                        {expandedMeal === meal.id && (
-                                            <div className="p-4 bg-gray-700">
-                                                <div className="mb-4 relative">
-                                                    <label htmlFor={`search-${meal.id}`} className="block text-sm font-medium text-gray-300 mb-1">
-                                                        Añadir alimento:
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        id={`search-${meal.id}`}
-                                                        placeholder="Buscar y añadir..."
-                                                        className="w-full p-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-gray-100 placeholder-gray-400"
-                                                        value={mealSearchTerms[meal.id] || ''}
-                                                        onChange={(e) => handleMealSearchChange(meal.id, e.target.value)}
-                                                        onKeyPress={(e) => handleSearchKeyPress(e, meal.id)}
-                                                    />
-                                                    {mealSearchTerms[meal.id] && mealSearchResults[meal.id] && mealSearchResults[meal.id].length > 0 && (
-                                                        <ul className="absolute z-10 w-full bg-gray-800 border border-gray-600 rounded-lg mt-1 max-h-48 overflow-y-auto custom-scrollbar shadow-lg">
-                                                            {mealSearchResults[meal.id].map(food => (
-                                                                <li
-                                                                    key={food.name}
-                                                                    className="p-2 hover:bg-gray-600 cursor-pointer text-gray-100"
-                                                                    onClick={() => addFoodToMeal(food, meal.id)}
-                                                                >
-                                                                    {food.name} ({food.calories} kcal)
+                                                    <div className="mb-3">
+                                                        <label htmlFor={`time-${meal.id}`} className="block text-xs font-medium text-gray-300 mb-1">
+                                                            Hora:
+                                                        </label>
+                                                        <input
+                                                            type="time"
+                                                            id={`time-${meal.id}`}
+                                                            value={meal.time}
+                                                            onChange={(e) => updateMealTime(meal.id, e.target.value)}
+                                                            className="p-1.5 text-sm border border-gray-600 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-gray-800 text-gray-100"
+                                                        />
+                                                    </div>
+                                                    {meal.items.length > 0 ? (
+                                                        <ul className="space-y-2">
+                                                            {meal.items.map((item, index) => (
+                                                                <li key={index} className="bg-gray-800 p-2 rounded-md shadow-sm flex flex-col sm:flex-row justify-between items-center border border-gray-600 text-sm">
+                                                                    <div className="flex-grow mb-1 sm:mb-0">
+                                                                        <p className="font-medium text-gray-50">{item.name}</p>
+                                                                        <p className="text-xs text-gray-300">
+                                                                            {(item.calories * (item.quantity / 100)).toFixed(1)} kcal
+                                                                            {item.price && ` (${(item.price * (item.quantity / 100)).toFixed(2)} €)`}
+                                                                        </p>
+                                                                    </div>
+                                                                    <div className="flex items-center space-x-2">
+                                                                        <input
+                                                                            type="number"
+                                                                            min="1"
+                                                                            value={item.quantity}
+                                                                            onChange={(e) => updateFoodQuantity(meal.id, index, e.target.value)}
+                                                                            className="w-16 p-1 border border-gray-600 rounded-md bg-gray-700 text-gray-100 text-center text-sm"
+                                                                        />
+                                                                        <span className="text-gray-300">{item.unit}</span>
+                                                                        <button
+                                                                            className="text-red-400 hover:text-red-600 transition duration-200"
+                                                                            onClick={() => removeFoodFromMeal(meal.id, index)}
+                                                                        >
+                                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 11-2 0v6a1 1 0 112 0V8z" clipRule="evenodd" />
+                                                                            </svg>
+                                                                        </button>
+                                                                    </div>
                                                                 </li>
                                                             ))}
                                                         </ul>
+                                                    ) : (
+                                                        <p className="text-center text-gray-400 text-sm">Añade alimentos a esta comida usando el buscador de arriba.</p>
                                                     )}
                                                 </div>
-
-                                                <div className="mb-4">
-                                                    <label htmlFor={`time-${meal.id}`} className="block text-sm font-medium text-gray-300 mb-1">
-                                                        Hora:
-                                                    </label>
-                                                    <input
-                                                        type="time"
-                                                        id={`time-${meal.id}`}
-                                                        value={meal.time}
-                                                        onChange={(e) => updateMealTime(meal.id, e.target.value)}
-                                                        className="p-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-gray-100"
-                                                    />
-                                                </div>
-                                                {meal.items.length > 0 ? (
-                                                    <ul className="space-y-2">
-                                                        {meal.items.map((item, index) => (
-                                                            <li key={index} className="bg-gray-800 p-3 rounded-lg shadow-sm flex flex-col sm:flex-row justify-between items-center border border-gray-600">
-                                                                <div className="flex-grow mb-2 sm:mb-0">
-                                                                    <p className="font-medium text-gray-50">{item.name}</p>
-                                                                    <p className="text-sm text-gray-300">{item.calories.toFixed(1)} kcal / 100{item.unitBase}</p>
-                                                                </div>
-                                                                <div className="flex items-center space-x-2">
-                                                                    <input
-                                                                        type="number"
-                                                                        min="1"
-                                                                        value={item.quantity}
-                                                                        onChange={(e) => updateFoodQuantity(meal.id, index, e.target.value)}
-                                                                        className="w-20 p-1 border border-gray-600 rounded-lg bg-gray-700 text-gray-100 text-center"
-                                                                    />
-                                                                    <span className="text-gray-300">{item.unit}</span>
-                                                                    <button
-                                                                        className="text-red-400 hover:text-red-600 transition duration-200"
-                                                                        onClick={() => removeFoodFromMeal(meal.id, index)}
-                                                                    >
-                                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 11-2 0v6a1 1 0 112 0V8z" clipRule="evenodd" />
-                                                                        </svg>
-                                                                    </button>
-                                                                </div>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                ) : (
-                                                    <p className="text-center text-gray-400">Añade alimentos a esta comida usando el buscador de arriba.</p>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
 
-                        {/* Sección de resumen nutricional */}
-                        <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-                            <h2 className="text-2xl font-bold text-gray-100 mb-4 text-center">Resumen Nutricional Diario</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Nutrient Summary Section (Right/Bottom) */}
+                        <div className="lg:w-1/3 bg-gray-800 p-4 rounded-lg shadow-lg flex flex-col">
+                            <h2 className="text-xl font-bold text-gray-100 mb-4 text-center">Resumen Nutricional Diario</h2>
+                            <div className="flex-grow space-y-4">
                                 {/* Información Principal (Macronutrientes y Precio) */}
-                                <div className="bg-blue-800 p-4 rounded-lg border border-blue-600">
-                                    <h3 className="text-xl font-bold text-blue-200 mb-2">Información Principal</h3>
-                                    <p className="font-semibold text-blue-200">Calorías:</p>
-                                    <p className="text-lg text-blue-50 mb-2">{dailyNutrients.calories.toFixed(1)} kcal</p>
-                                    <p className="font-semibold text-blue-200">Proteínas:</p>
-                                    <p className="text-lg text-blue-50 mb-2">{dailyNutrients.protein.toFixed(1)} g</p>
-                                    <p className="font-semibold text-blue-200">Carbohidratos:</p>
-                                    <p className="text-lg text-blue-50 mb-2">{dailyNutrients.carbs.toFixed(1)} g</p>
-                                    <p className="font-semibold text-blue-200">Azúcares:</p>
-                                    <p className="text-lg text-blue-50 mb-2">{dailyNutrients.sugars.toFixed(1)} g</p>
-                                    <p className="font-semibold text-blue-200">Grasas:</p>
-                                    <p className="text-lg text-blue-50 mb-2">{dailyNutrients.fat.toFixed(1)} g</p>
-                                    <p className="font-semibold text-blue-200">Grasas Saturadas:</p>
-                                    <p className="text-lg text-blue-50 mb-2">{dailyNutrients.saturatedFat.toFixed(1)} g</p>
-                                    <p className="font-semibold text-blue-200">Fibra:</p>
-                                    <p className="text-lg text-blue-50 mb-2">{dailyNutrients.fiber.toFixed(1)} g</p>
-                                    <p className="font-semibold text-blue-200">Sal:</p>
-                                    <p className="text-lg text-blue-50 mb-2">{dailyNutrients.salt.toFixed(1)} g</p>
-                                    <p className="font-semibold text-blue-200">Precio Diario:</p>
-                                    <p className="text-lg text-blue-50">{dailyNutrients.price.toFixed(2)} €</p>
+                                <div key={`main-nutrients-${nutrientHighlightKey}`} className="bg-blue-800 p-3 rounded-lg border border-blue-600 nutrient-highlight">
+                                    <h3 className="text-lg font-bold text-blue-200 mb-2">Información Principal</h3>
+                                    <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm">
+                                        <div><p className="font-semibold text-blue-200">Calorías:</p><p className="text-blue-50">{dailyNutrients.calories.toFixed(1)} kcal</p></div>
+                                        <div><p className="font-semibold text-blue-200">Proteínas:</p><p className="text-blue-50">{dailyNutrients.protein.toFixed(1)} g</p></div>
+                                        <div><p className="font-semibold text-blue-200">Carbohidratos:</p><p className="text-blue-50">{dailyNutrients.carbs.toFixed(1)} g</p></div>
+                                        <div><p className="font-semibold text-blue-200">Azúcares:</p><p className="text-blue-50">{dailyNutrients.sugars.toFixed(1)} g</p></div>
+                                        <div><p className="font-semibold text-blue-200">Grasas:</p><p className="text-blue-50">{dailyNutrients.fat.toFixed(1)} g</p></div>
+                                        <div><p className="font-semibold text-blue-200">Grasas Sat.:</p><p className="text-blue-50">{dailyNutrients.saturatedFat.toFixed(1)} g</p></div>
+                                        <div><p className="font-semibold text-blue-200">Fibra:</p><p className="text-blue-50">{dailyNutrients.fiber.toFixed(1)} g</p></div>
+                                        <div><p className="font-semibold text-blue-200">Sal:</p><p className="text-blue-50">{dailyNutrients.salt.toFixed(1)} g</p></div>
+                                        <div className="col-span-2"><p className="font-semibold text-blue-200">Precio Diario:</p><p className="text-lg text-blue-50">{dailyNutrients.price.toFixed(2)} €</p></div>
+                                    </div>
                                 </div>
 
                                 {/* Vitaminas */}
-                                <div className="bg-green-800 p-4 rounded-lg border border-green-600">
-                                    <h3 className="text-xl font-bold text-green-200 mb-2">Vitaminas</h3>
-                                    {vitamins.length > 0 ? (
-                                        vitamins.map(([name, data]) => (
-                                            <div key={name} className="mb-1">
-                                                <p className="font-semibold text-green-200 text-sm">{name}:</p>
-                                                <p className="text-base text-green-50">{data.value.toFixed(2)} {data.unit}</p>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <p className="text-sm text-green-300">No hay vitaminas registradas.</p>
-                                    )}
+                                <div key={`vitamins-${nutrientHighlightKey}`} className="bg-green-800 p-3 rounded-lg border border-green-600 nutrient-highlight">
+                                    <h3 className="text-lg font-bold text-green-200 mb-2">Vitaminas</h3>
+                                    <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm">
+                                        {vitamins.length > 0 ? (
+                                            vitamins.map(([name, data]) => (
+                                                <div key={name}>
+                                                    <p className="font-semibold text-green-200 text-xs">{name}:</p>
+                                                    <p className="text-sm text-green-50">{data.value.toFixed(2)} {data.unit}</p>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-xs text-green-300 col-span-2">No hay vitaminas registradas.</p>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Minerales */}
-                                <div className="bg-purple-800 p-4 rounded-lg border border-purple-600">
-                                    <h3 className="text-xl font-bold text-purple-200 mb-2">Minerales</h3>
-                                    {minerals.length > 0 ? (
-                                        minerals.map(([name, data]) => (
-                                            <div key={name} className="mb-1">
-                                                <p className="font-semibold text-purple-200 text-sm">{name}:</p>
-                                                <p className="text-base text-purple-50">{data.value.toFixed(2)} {data.unit}</p>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <p className="text-sm text-purple-300">No hay minerales registrados.</p>
-                                    )}
+                                <div key={`minerals-${nutrientHighlightKey}`} className="bg-purple-800 p-3 rounded-lg border border-purple-600 nutrient-highlight">
+                                    <h3 className="text-lg font-bold text-purple-200 mb-2">Minerales</h3>
+                                    <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-sm">
+                                        {minerals.length > 0 ? (
+                                            minerals.map(([name, data]) => (
+                                                <div key={name}>
+                                                    <p className="font-semibold text-purple-200 text-xs">{name}:</p>
+                                                    <p className="text-sm text-purple-50">{data.value.toFixed(2)} {data.unit}</p>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-xs text-purple-300 col-span-2">No hay minerales registrados.</p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -412,7 +401,7 @@
                 </div>
             );
         };
-        // Renderiza el componente App en el elemento con id 'root'
+        // Render the App component to the 'root' element
         ReactDOM.render(<App />, document.getElementById('root'));
     </script>
 </body>
